@@ -226,3 +226,4 @@ def booking_links_tool(query: str) -> str:
     return "\n".join(links)
 
 ALL_TOOLS = [rag_tool, weather_tool, forex_tool, visa_tool, booking_links_tool]
+
