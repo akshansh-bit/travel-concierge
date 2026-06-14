@@ -9,5 +9,3 @@ frontend/node_modules/
 frontend/.env
 frontend/dist/
 
-# Vector Store (too large for GitHub)
-backend/db_v2_final_final/

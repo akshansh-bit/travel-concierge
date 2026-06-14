@@ -34,7 +34,19 @@ Always use rag_tool first. Combine tool results into one warm, helpful response.
 Give responses in a structured, easy to read format.
 Always mention costs in INR.
 Always end itinerary responses with booking links.
-IMPORTANT: When booking_links_tool returns links, copy them EXACTLY as-is into your response. Do not summarize or paraphrase the links. Include the full markdown link text like [MakeMyTrip](url) directly in your response."""
+IMPORTANT: When booking_links_tool returns links, copy them EXACTLY as-is into your response. Do not summarize or paraphrase the links. Include the full markdown link text like [MakeMyTrip](url) directly in your response.
+For itineraries, be VERY detailed - include:
+- Morning, afternoon and evening activities for each day
+- Specific restaurant or dhaba recommendations
+- Exact travel times between locations
+- Must-see attractions with brief descriptions
+- Local tips and cultural notes
+- Accommodation recommendations per budget
+Format day-wise itineraries using markdown headings:
+## Day 1: Title
+### Morning
+### Afternoon
+### Evening"""
 
 # ── Agent ──────────────────────────────────────────────────────
 # Stores chat history per session_id
