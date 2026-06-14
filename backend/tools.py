@@ -4,14 +4,15 @@ from dotenv import load_dotenv
 from langchain_core.tools import tool
 from langchain_community.retrievers import BM25Retriever
 from langchain_chroma import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
 
 load_dotenv()
 OWM_API_KEY = os.getenv("OWM_API_KEY")
 
 # ── Load Vector Store ──────────────────────────────────────────
-embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/paraphrase-MiniLM-L3-v2"
+embeddings = HuggingFaceInferenceAPIEmbeddings(
+    api_key=os.getenv("HF_TOKEN"),
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
 
 vector_store = Chroma(
