@@ -13,3 +13,4 @@ sentence-transformers
 python-dotenv
 pypdf
 pydantic
+fastembed
