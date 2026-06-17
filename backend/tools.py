@@ -10,8 +10,11 @@ OWM_API_KEY = os.getenv("OWM_API_KEY")
 
 # ── Load Vector Store ──────────────────────────────────────────
 if os.getenv("RENDER"):
-    from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
-    embeddings = FastEmbedEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    from langchain_google_genai import GoogleGenerativeAIEmbeddings
+    embeddings = GoogleGenerativeAIEmbeddings(
+        model="models/embedding-001",
+        google_api_key=os.getenv("GOOGLE_API_KEY")
+    )
 else:
     from langchain_community.embeddings import HuggingFaceEmbeddings
     embeddings = HuggingFaceEmbeddings(
