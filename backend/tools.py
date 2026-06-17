@@ -12,7 +12,7 @@ OWM_API_KEY = os.getenv("OWM_API_KEY")
 if os.getenv("RENDER"):
     from langchain_google_genai import GoogleGenerativeAIEmbeddings
     embeddings = GoogleGenerativeAIEmbeddings(
-        model="models/embedding-001",
+        model="models/text-embedding-004",
         google_api_key=os.getenv("GOOGLE_API_KEY")
     )
 else:
