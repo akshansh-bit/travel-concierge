@@ -10,33 +10,29 @@ OWM_API_KEY = os.getenv("OWM_API_KEY")
 
 # ── Load Vector Store ──────────────────────────────────────────
 if os.getenv("RENDER"):
-    from langchain_google_genai import GoogleGenerativeAIEmbeddings
-    embeddings = GoogleGenerativeAIEmbeddings(
-        model="models/text-embedding-004",
-        google_api_key=os.getenv("GOOGLE_API_KEY")
-    )
+    vector_retriever = None
+    docs_for_bm25 = []
 else:
     from langchain_community.embeddings import HuggingFaceEmbeddings
     embeddings = HuggingFaceEmbeddings(
         model_name="sentence-transformers/all-MiniLM-L6-v2"
     )
+    vector_store = Chroma(
+        embedding_function=embeddings,
+        persist_directory="db_v2_final_final",
+        collection_name="travel_docs_v2_final"
+    )
+    all_docs = vector_store.get()
+    from langchain_core.documents import Document
+    docs_for_bm25 = [
+        Document(page_content=text)
+        for text in all_docs["documents"]
+    ]
+    vector_retriever = vector_store.as_retriever(search_kwargs={"k": 6})
 
-vector_store = Chroma(
-    embedding_function=embeddings,
-    persist_directory="db_v2_final_final",
-    collection_name="travel_docs_v2_final"
-)
-
-all_docs = vector_store.get()
-from langchain_core.documents import Document
-docs_for_bm25 = [
-    Document(page_content=text)
-    for text in all_docs["documents"]
-]
-
-vector_retriever = vector_store.as_retriever(search_kwargs={"k": 6})
-bm25_retriever   = BM25Retriever.from_documents(docs_for_bm25)
-bm25_retriever.k = 6
+bm25_retriever = BM25Retriever.from_documents(docs_for_bm25) if docs_for_bm25 else None
+if bm25_retriever:
+    bm25_retriever.k = 6
 
 # ── Hybrid Retriever ───────────────────────────────────────────
 class HybridRetriever:
@@ -46,8 +42,12 @@ class HybridRetriever:
         self.k          = k
 
     def invoke(self, query: str):
-        vec_docs  = self.vector_ret.invoke(query)
-        bm25_docs = self.bm25_ret.invoke(query)
+        if self.bm25_ret is None and self.vector_ret is None:
+            return []
+        bm25_docs = self.bm25_ret.invoke(query) if self.bm25_ret else []
+        if self.vector_ret is None:
+            return bm25_docs[:self.k]
+        vec_docs = self.vector_ret.invoke(query)
         seen, merged = set(), []
         for doc in vec_docs + bm25_docs:
             key = doc.page_content[:100]
