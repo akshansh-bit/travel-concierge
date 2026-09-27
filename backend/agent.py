@@ -63,13 +63,13 @@ def run_agent(query: str, session_id: str = "default") -> str:
     messages = [SystemMessage(content=SYSTEM_PROMPT)] + chat_history
 
     # Loop: keep letting the model call tools until it returns a final
-    # plain-text answer with no more tool calls. This fixes the bug where
-    # a SECOND round of tool calls (e.g. booking_links_tool after
-    # rag_tool) was silently dropped, leaving response.content empty.
+    # plain-text answer with no more tool calls.
     response = None
     max_steps = 5
 
-    for _ in range(max_steps):
+    for step in range(max_steps):
+        print(f"\n=== STEP {step + 1} ===")
+
         # Retry the LLM call itself in case Groq throws an output_parse_failed
         # error (happens occasionally with gpt-oss models mixing reasoning
         # text into tool-call output).
@@ -83,17 +83,20 @@ def run_agent(query: str, session_id: str = "default") -> str:
                 print(f"  ⚠️ LLM call failed (attempt {attempt + 1}): {e}")
 
         if not llm_call_succeeded:
-            # Both attempts failed — bail out cleanly instead of crashing
             fallback = "Sorry, I had trouble processing that. Could you please rephrase or try again?"
             chat_history.append(HumanMessage(content=fallback))
             return fallback
 
         messages.append(response)
 
+        print(f"  📝 response.content: {repr(response.content)[:300]}")
+        print(f"  🔩 tool_calls: {response.tool_calls}")
+
         if not response.tool_calls:
             break  # model gave a final text answer, stop looping
 
         for tool_call in response.tool_calls:
+            print(f"  🔧 Tool: {tool_call['name']} | Args: {tool_call['args']}")
             tool_fn = next(
                 (t for t in ALL_TOOLS if t.name == tool_call["name"]), None
             )
@@ -102,14 +105,13 @@ def run_agent(query: str, session_id: str = "default") -> str:
                     result = tool_fn.invoke(tool_call["args"])
                 except Exception as e:
                     result = f"Error running tool: {e}"
-                print(f"  🔧 Used tool: {tool_call['name']}")
+                print(f"  📄 Result preview: {str(result)[:300]}")
                 messages.append(ToolMessage(
                     content=str(result),
                     tool_call_id=tool_call["id"]
                 ))
             else:
-                # Unknown tool name requested — feed back an error so the
-                # model doesn't get stuck waiting for a ToolMessage it needs
+                print(f"  ❌ Tool '{tool_call['name']}' not found in ALL_TOOLS")
                 messages.append(ToolMessage(
                     content=f"Error: tool '{tool_call['name']}' not found.",
                     tool_call_id=tool_call["id"]
