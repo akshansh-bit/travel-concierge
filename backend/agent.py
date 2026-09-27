@@ -17,7 +17,7 @@ llm = ChatGroq(
 llm_with_tools = llm.bind_tools(ALL_TOOLS)
 
 # ── System Prompt ──────────────────────────────────────────────
-SYSTEM_PROMPT = """You are an expert AI Travel Concierge for Indian travellers.
+SYSTEM_PROMPT = SYSTEM_PROMPT = """You are an expert AI Travel Concierge for Indian travellers.
 Use tools smartly:
 - rag_tool           → destination info, itineraries, budget, best time
 - weather_tool       → current weather at destination
@@ -62,19 +62,12 @@ def run_agent(query: str, session_id: str = "default") -> str:
 
     messages = [SystemMessage(content=SYSTEM_PROMPT)] + chat_history
 
-    # Loop: keep letting the model call tools until it returns a final
-    # plain-text answer with no more tool calls. This fixes the bug where
-    # a SECOND round of tool calls (e.g. booking_links_tool after
-    # rag_tool) was silently dropped, leaving response.content empty.
-    response = None
-    max_steps = 5
-    for _ in range(max_steps):
-        response = llm_with_tools.invoke(messages)
+    # Step 1 — LLM decides which tools to call
+    response = llm_with_tools.invoke(messages)
+
+    # Step 2 — Run all requested tools
+    if response.tool_calls:
         messages.append(response)
-
-        if not response.tool_calls:
-            break  # model gave a final text answer, stop looping
-
         for tool_call in response.tool_calls:
             tool_fn = next(
                 (t for t in ALL_TOOLS if t.name == tool_call["name"]), None
@@ -86,19 +79,28 @@ def run_agent(query: str, session_id: str = "default") -> str:
                     content=str(result),
                     tool_call_id=tool_call["id"]
                 ))
-            else:
-                # Unknown tool name requested — feed back an error so the
-                # model doesn't get stuck waiting for a ToolMessage it needs
-                messages.append(ToolMessage(
-                    content=f"Error: tool '{tool_call['name']}' not found.",
-                    tool_call_id=tool_call["id"]
-                ))
 
-    final_text = (response.content if response else "") or \
-        "Sorry, I couldn't generate a response. Please try again."
+        # Step 3 — Final answer using tool results
+        final = llm_with_tools.invoke(messages)
+        chat_history.append(final)
+
+        # Inject booking links directly if present
+        booking_result = ""
+        for tool_call in response.tool_calls:
+            if tool_call["name"] == "booking_links_tool":
+                tool_fn = next(
+                    (t for t in ALL_TOOLS if t.name == "booking_links_tool"), None
+                )
+                if tool_fn:
+                    booking_result = tool_fn.invoke(tool_call["args"])
+                    break
+        
+        if booking_result:
+            return final.content + "\n\n---\n" + booking_result
+        return final.content
 
     chat_history.append(response)
-    return final_text
+    return response.content
 
 def clear_session(session_id: str = "default"):
     if session_id in session_histories:
