@@ -68,8 +68,26 @@ def run_agent(query: str, session_id: str = "default") -> str:
     # rag_tool) was silently dropped, leaving response.content empty.
     response = None
     max_steps = 5
+
     for _ in range(max_steps):
-        response = llm_with_tools.invoke(messages)
+        # Retry the LLM call itself in case Groq throws an output_parse_failed
+        # error (happens occasionally with gpt-oss models mixing reasoning
+        # text into tool-call output).
+        llm_call_succeeded = False
+        for attempt in range(2):
+            try:
+                response = llm_with_tools.invoke(messages)
+                llm_call_succeeded = True
+                break
+            except Exception as e:
+                print(f"  ⚠️ LLM call failed (attempt {attempt + 1}): {e}")
+
+        if not llm_call_succeeded:
+            # Both attempts failed — bail out cleanly instead of crashing
+            fallback = "Sorry, I had trouble processing that. Could you please rephrase or try again?"
+            chat_history.append(HumanMessage(content=fallback))
+            return fallback
+
         messages.append(response)
 
         if not response.tool_calls:
@@ -80,7 +98,10 @@ def run_agent(query: str, session_id: str = "default") -> str:
                 (t for t in ALL_TOOLS if t.name == tool_call["name"]), None
             )
             if tool_fn:
-                result = tool_fn.invoke(tool_call["args"])
+                try:
+                    result = tool_fn.invoke(tool_call["args"])
+                except Exception as e:
+                    result = f"Error running tool: {e}"
                 print(f"  🔧 Used tool: {tool_call['name']}")
                 messages.append(ToolMessage(
                     content=str(result),
